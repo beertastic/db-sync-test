@@ -1,0 +1,836 @@
+<?php require_once("../../session/session.php") ?>
+
+<?php
+
+function GetCurrencyCodes()
+{
+    error_log("HEIDER: Reading Currency Table...");
+
+    $SqlConnected = false;
+
+    //        if (pg_connection_status($SqlConnection) != PGSQL_CONNECTION_OK)
+    //        {
+    //        }
+
+
+    try
+    {
+        $SqlConnection = pg_connect($_SESSION["ConnectionString"]);
+
+        if ($_SESSION["DEBUG"]) error_log("Connection Status: " . pg_connection_status($SqlConnection));
+
+        if ($SqlConnection)
+        {
+            if ($_SESSION["DEBUG"]) error_log("Connected to SQL Server<br>");
+            $SqlConnected = true;
+        } else {
+            if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Server connection failed: " . pg_last_error($SqlConnection) . "\r\n");
+        }
+
+    } catch (PDOException $e) {
+        echo "Error while connecting to SQL server: " . $e->getMessage() . "<br>";
+    }
+
+
+    if ($SqlConnected)
+    {
+        try
+        {
+            $SqlString = "Select * from system.currency_code ";
+
+            $ResultSet = pg_query($SqlConnection, $SqlString);
+
+            if ($ResultSet)
+            {
+                while ($Row = pg_fetch_assoc($ResultSet))
+                {
+                    printf("Currency Code (%08u) is at: %08.03f <br>", $Row['id'], $Row['rate']);
+//                        echo ("Currency Code " . $Row['id'] . " is at: " . $Row['rate'] . " <br>");
+                }
+
+            } else {
+                if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Query failed: " . pg_last_error($SqlConnection) . "\r\n");
+            }
+
+        } catch (PDOException $e) {
+            echo "Error while Querying SQL server: " . $e->getMessage() . "<br>";
+        }
+
+        /*          Removing the code to close the PG connection as this will be re-used when calling PG_CONNECT ...
+                try
+                {
+                    pg_close($SqlConnection);
+                } catch (Exception $e) {
+                    // Nothing to do here, ignore the close error...
+                }
+        */
+    }
+
+
+
+
+}
+
+
+
+function GetYachtsList($YachtProfileID)
+{
+    $SqlConnected = false;
+
+    //        if (pg_connection_status($SqlConnection) != PGSQL_CONNECTION_OK)
+    //        {
+    //        }
+
+
+    try
+    {
+        $SqlConnection = pg_connect($_SESSION["ConnectionString"]);
+
+        if ($_SESSION["DEBUG"]) error_log("Connection Status: " . pg_connection_status($SqlConnection));
+
+        if ($SqlConnection)
+        {
+            if ($_SESSION["DEBUG"]) error_log("Connected to SQL Server<br>");
+            $SqlConnected = true;
+        } else {
+            if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Server connection failed: " . pg_last_error($SqlConnection) . "\r\n");
+        }
+
+    } catch (PDOException $e) {
+        echo "Error while connecting to SQL server: " . $e->getMessage() . "<br>";
+    }
+
+
+    if ($SqlConnected)
+    {
+        try
+        {
+            $SqlString = "Select * "
+                       . " From public.property_profile "
+                       . "  left outer join public.property_description on public.property_description.id = public.property_profile.property_description_id "
+                       . "  left outer join public.property on public.property.id = public.property_profile.property_id "
+                       . "  left outer join public.property_yacht on public.property_yacht.property_id = public.property.id "
+                       . " Where public.property_profile.visible_website = true "
+                       . "  and  public.property_profile.marketing_status_id <> 1 "
+                       . "  and  public.property_profile.id = " . $YachtProfileID;
+
+
+
+            $ResultSet = pg_query($SqlConnection, $SqlString);
+
+            if ($ResultSet)
+            {
+                while ($Row = pg_fetch_assoc($ResultSet))
+                {
+                    printf("Caption: %s\r\n %s", $Row['caption'], $Row['overview']);
+                    printf($Row['caption'] . $Row['overview']);
+                }
+
+            } else {
+                if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Query failed: " . pg_last_error($SqlConnection) . "\r\n");
+                if ($_SESSION["DEBUG"]) error_log("Sql Query: " . $SqlString);
+            }
+
+        } catch (PDOException $e) {
+            echo "Error while Querying SQL server: " . $e->getMessage() . "<br>";
+        }
+
+/*          Removing the code to close the PG connection as this will be re-used when calling PG_CONNECT ...
+        try
+        {
+            pg_close($SqlConnection);
+        } catch (Exception $e) {
+            // Nothing to do here, ignore the close error...
+        }
+*/
+    }
+
+
+
+
+}
+
+
+
+
+function GetYachtInfo($YachtProfileID, $YachtProfileType, &$YachtName, &$YachtDesc, &$YachtCaption, &$YachtOverview, &$YachtLength, &$YachtBuildYear)
+{
+    // $YachtProfileType     -> Either "SALES" or "CHARTER" or "FLEET"
+
+    $SqlConnected = false;
+
+    //        if (pg_connection_status($SqlConnection) != PGSQL_CONNECTION_OK)
+    //        {
+    //        }
+
+
+    try
+    {
+        $SqlConnection = pg_connect($_SESSION["ConnectionString"]);
+
+        if ($_SESSION["DEBUG"]) error_log("Connection Status: " . pg_connection_status($SqlConnection));
+
+        if ($SqlConnection)
+        {
+            if ($_SESSION["DEBUG"]) error_log("Connected to SQL Server\r\n");
+            $SqlConnected = true;
+        } else {
+            if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Server connection failed: " . pg_last_error($SqlConnection) . "\r\n");
+        }
+
+    } catch (PDOException $e) {
+        echo "Error while connecting to SQL server: " . $e->getMessage() . "<br>";
+    }
+
+
+    if ($SqlConnected)
+    {
+        try
+        {
+/*
+            $SqlString = "Select "
+                    . "     public.property_yacht.name, public.property_description.description, public.property_description.caption "
+                    . "   , public.property_description.overview, public.property_yacht.default_image_credit, public.property_yacht.length "
+                    . "   , public.property_yacht.built "
+                    . " From public.property_profile "
+                    . "  left outer join public.property_description on public.property_description.id = public.property_profile.property_description_id "
+                    . "  left outer join public.property on public.property.id = public.property_profile.property_id "
+                    . "  left outer join public.property_yacht on public.property_yacht.property_id = public.property.id "
+                    . " Where public.property_profile.visible_website = true "
+                    . "  and  public.property_profile.marketing_status_id <> 1 "
+                    . "  and  public.property_profile.id = " . $YachtProfileID;
+*/
+
+        if ( ($YachtProfileType == "SALES") || ($YachtProfileType == "CHARTER") )
+        {
+            $SqlString = "Select public.property_yacht.name, public.property_yacht.built, public.property_yacht.default_image_credit, public.property_yacht.length "
+                       . "     , public.property_description.overview, public.property_description.description, public.property_description.caption "
+                       . " From  system.property_profile_type, public.property_profile, public.property_yacht, public.property_description "
+                       . " where public.property_profile.property_id = public.property_yacht.id "
+                       . "  and  public.property_profile.property_description_id = public.property_description.id "
+                       . "  and  system.property_profile_type.id = public.property_profile.property_profile_type_id "
+                       . "  and  system.property_profile_type._constant = '" . $YachtProfileType . "'  "  //  ("SALES" / "CHARTER") */
+                       . "  and  public.property_yacht.id = " . $YachtProfileID;
+        } else {
+/*
+            $SqlString = "Select public.property_yacht.name, public.property_yacht.built, public.property_yacht.default_image_credit, public.property_yacht.length "
+                       . "     , public.property_description.overview, public.property_description.description, public.property_description.caption "
+                       . " From  system.property_profile_type, public.property_profile, public.property_yacht, public.property_description "
+                       . " where public.property_profile.property_id = public.property_yacht.id "
+                       . "  and  public.property_profile.property_description_id = public.property_description.id "
+                       . "  and  system.property_profile_type.id = public.property_profile.property_profile_type_id "
+                       . "  and  system.property_profile_type._constant = '" . $YachtProfileType . "' "
+                       . "  and  public.property_yacht.id = " . $YachtProfileID;
+*/
+        }
+
+
+
+            $ResultSet = pg_query($SqlConnection, $SqlString);
+
+            if ($ResultSet)
+            {
+                $Row = pg_fetch_assoc($ResultSet);
+
+                if ($Row)
+                {
+                    $YachtName = $Row['name'];
+                    $YachtDesc= $Row['description'];
+                    $YachtCaption = $Row['caption'];
+                    $YachtOverview = $Row['overview'];
+                    $YachtLength = $Row['length'];
+                    $YachtBuildYear = $Row['built'];
+
+                    if ($YachtLength > intval($YachtLength))
+                    {
+                        $YachtLength = number_format($YachtLength,1) ;
+                    } else {
+                        $YachtLength = intval($YachtLength) ;
+                    }
+                }
+
+            } else {
+                if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Query failed: " . pg_last_error($SqlConnection) . "\r\n");
+                if ($_SESSION["DEBUG"]) error_log("Sql Query: " . $SqlString . "\r\n");
+                die("Server Error.");
+            }
+
+        } catch (PDOException $e) {
+            echo "Error while Querying SQL server: " . $e->getMessage() . "<br>";
+        }
+
+        /*          Removing the code to close the PG connection as this will be re-used when calling PG_CONNECT ...
+                try
+                {
+                    pg_close($SqlConnection);
+                } catch (Exception $e) {
+                    // Nothing to do here, ignore the close error...
+                }
+        */
+    }
+
+
+
+
+}
+
+
+
+
+function GetSimilarYachts($YachtID)
+{
+/*
+    $SqlConnected = false;
+
+    //        if (pg_connection_status($SqlConnection) != PGSQL_CONNECTION_OK)
+    //        {
+    //        }
+
+
+    try
+    {
+        $SqlConnection = pg_connect($_SESSION["ConnectionString"]);
+
+        if ($_SESSION["DEBUG"]) error_log("Connection Status: " . pg_connection_status($SqlConnection));
+
+        if ($SqlConnection)
+        {
+            if ($_SESSION["DEBUG"]) error_log("Connected to SQL Server\r\n");
+            $SqlConnected = true;
+        } else {
+            if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Server connection failed: " . pg_last_error($SqlConnection) . "\r\n");
+        }
+
+    } catch (PDOException $e) {
+        echo "Error while connecting to SQL server: " . $e->getMessage() . "<br>";
+    }
+
+
+    if ($SqlConnected)
+    {
+        try
+        {
+            $SqlString = "Select "
+                . "     public.property_yacht.name, public.property_description.description, public.property_description.caption "
+                . "   , public.property_description.overview, public.property_yacht.default_image_credit, public.property_yacht.length "
+                . "   , public.property_yacht.built "
+                . " From public.property_profile "
+                . "  left outer join public.property_description on public.property_description.id = public.property_profile.property_description_id "
+                . "  left outer join public.property on public.property.id = public.property_profile.property_id "
+                . "  left outer join public.property_yacht on public.property_yacht.property_id = public.property.id "
+                . " Where public.property_profile.visible_website = true "
+                . "  and  public.property_profile.marketing_status_id <> 1 "
+                . "  and  public.property_profile.id = " . $YachtProfileID;
+
+
+
+            $ResultSet = pg_query($SqlConnection, $SqlString);
+
+            if ($ResultSet)
+            {
+                $Row = pg_fetch_assoc($ResultSet);
+
+                if ($Row)
+                {
+                    $YachtName = $Row['name'];
+                    $YachtDesc= $Row['description'];
+                    $YachtCaption = $Row['caption'];
+                    $YachtOverview = $Row['overview'];
+                    $YachtLength = $Row['length'];
+                    $YachtBuildYear = $Row['built'];
+
+                    if ($YachtLength > intval($YachtLength))
+                    {
+                        $YachtLength = number_format($YachtLength,1) ;
+                    } else {
+                        $YachtLength = intval($YachtLength) ;
+                    }
+                }
+
+            } else {
+                if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Query failed: " . pg_last_error($SqlConnection) . "\r\n");
+                if ($_SESSION["DEBUG"]) error_log("Sql Query: " . $SqlString . "\r\n");
+                die("Server Error.");
+            }
+
+        } catch (PDOException $e) {
+            echo "Error while Querying SQL server: " . $e->getMessage() . "<br>";
+        }
+
+        /*          Removing the code to close the PG connection as this will be re-used when calling PG_CONNECT ...
+                try
+                {
+                    pg_close($SqlConnection);
+                } catch (Exception $e) {
+                    // Nothing to do here, ignore the close error...
+                }
+        * /
+    }
+*/
+
+
+
+
+
+    for ($i=0; $i<10; $i++)
+    {
+        echo '
+        <div class="swiper-slide">
+
+            <div class="yacht-card yacht-card--sale ">
+                <a class="yacht-card__thumbnail" href="">
+                    <img src="/assets/images/n_placeholders/yacht-card/yacht-1.png" alt="">
+
+
+
+                    <div class="yacht-card__status">For sale</div>
+
+                    <h3>xxxCarinthia ' . $i . '</h3>
+                </a>
+
+                <div class="yacht-card__body">
+                    <div class="yacht-card__builders">
+                        <div class="swiper-container yacht-card__detail-swiper">
+                            <div class="swiper-wrapper">
+                                <div class="swiper-slide">
+                                    <div class="yacht-card__detail-slide-inner">
+                                        <p class="yacht-card__detail-name">Naval architect</p>
+                                        <p class="yacht-card__detail-value">
+                                            <a href="/directory/company-profile.php?tab=overview">Lürssen Yachts</a>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="swiper-slide">
+                                    <div class="yacht-card__detail-slide-inner">
+                                        <p class="yacht-card__detail-name">Exterior Designer</p>
+                                        <p class="yacht-card__detail-value">
+                                            <a href="/directory/company-profile.php?tab=overview">Tim Heywood Design</a>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="swiper-slide">
+                                    <div class="yacht-card__detail-slide-inner">
+                                        <p class="yacht-card__detail-name">Interior Designer</p>
+                                        <p class="yacht-card__detail-value">
+                                            <a href="/directory/company-profile.php?tab=overview">Tim Heywood Design</a>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="swiper-pagination"></div>
+                        </div>
+                    </div>
+                    <div class="yacht-card__circles">
+            <span class="circle-container">
+                <svg width="76" height="76" class="ring">
+                    <circle r="38" cx="38" cy="38" class="pie"></circle>
+                </svg>
+                <span class="circle-val circle-val-length">
+                    <span class="lbl">length</span>
+                    <span class="val" data-length="97.2">97.2m</span>
+                </span>
+            </span>
+                        <span class="circle-container">
+                <svg width="76" height="76" class="ring">
+                    <circle r="38" cx="38" cy="38" class="pie"></circle>
+                </svg>
+                <span class="circle-val circle-val-year">
+                    <span class="lbl">year</span>
+                    <span class="val" data-year="2002">2002</span>
+                </span>
+            </span>
+                    </div>
+                </div>
+                <a class="yacht-card__footer-link" href="">Go to sale listing <span class="icon-arrow-line-right"></span></a>
+
+                <div class="yacht-card__centrally-managed-by">
+                    <p>Centrally managed by</p>
+                    <img src="/assets/images/n_placeholders/company-pack/chunky-logo-2.jpg" alt="">
+                </div>
+            </div>
+        </div>
+        ';
+
+    }
+}
+
+
+function GetYachtHeroDemoImage($YachtID)
+{
+    return '
+    <div class="section-container section-hero">
+        <div>
+            <img style="width:100%" class="hide-mobile hide-smartphone" src="/assets/images/n_placeholders/hero-player/hero-player.jpg" alt="">
+            <img style="width:100%" class="hide-tablet hide-desktop" src="/assets/images/n_placeholders/hero-player/hero-player-mobile.png" alt="">
+        </div>
+    </div>
+    ';
+}
+
+
+
+
+function GetYachtVideoURL($VideoID)
+{
+//    Example:  $VideoID = 952660;        // Vizzar Video ID at the moment... will change...
+//      https://view.vzaar.com/952660/image
+//      https://view.vzaar.com/952660/video
+//      https://view.vzaar.com/952660/wbem
+
+
+//    $VizzarImage = 'https://view.vzaar.com/' . $VideoID . '/image';
+    $VizzarVideo = 'https://view.vzaar.com/' . $VideoID . '/video';
+
+
+    return $VizzarVideo;
+}
+
+
+
+function GetYachtImageURL( $Width, $Height, $Quality, $Options, $YachtName, $Crop, $CropId )
+{
+    $GUID = "000007-c0a80106-48ae9887-a656-6f024784";
+
+//    $VizzarImage = 'https://view.vzaar.com/' . $VideoID . '/image';
+//    $VizzarVideo = 'https://view.vzaar.com/' . $VideoID . '/image';
+
+
+    //https://view.vzaar.com/952660/image
+    //https://view.vzaar.com/952660/video
+    //https://view.vzaar.com/952660/wbem
+
+//    $ImageURL = "property/yacht/resource/superyacht-" . Slugify( yachtName ) . "-" . id . ".jpg"; //, options, genKey, width, height, quality ).toString();
+
+    return ""; // $VizzarVideo;
+}
+
+
+
+
+
+function GetYachtMainSectionImagesAndVideos($YachtProfileID, &$JavaVideoArray, &$HtmlSlides)
+{
+    $JavaVideoArray = "<script language='javascript'>
+    var VideoPages = [
+        ";
+
+
+    $JavaVideoArray = "";
+
+/*
+    $JavaVideoArray = $JavaVideoArray . "
+      ['viddivhero', 'hsvid1', 'v.mp4', 'viddivside1', 'hsvid1s', 'v23.mp4', 'viddivside2', 'hsvid2s', 'V21.mp4']
+    , ['viddivhero', 'hsvid1', 'V14.mp4', 'viddivside1', 'hsvid1s', 'V22.mp4', 'viddivside2', 'hsvid2s', 'v11.mp4']
+    , ['viddivhero', 'hsvid1', 'V15.mp4', 'viddivside1', 'hsvid1s', 'v23.mp4', 'viddivside2', 'hsvid2s', 'V12.mp4']
+    , ['viddivhero', 'hsvid1', 'heider.jpg', 'viddivside1', 'hsvid1s', 'heider.jpg', 'viddivside2', 'hsvid2s', 'heider.jpg']
+    , ['viddivhero', 'hsvid1', 'hero-h1.jpg', 'viddivside1', 'hsvid1s', '', 'viddivside2', 'hsvid2s', '']
+    ";
+*/
+
+
+    $SqlConnected = false;
+    $TotalSlides = 0;
+
+    try
+    {
+        $SqlConnection = pg_connect($_SESSION["ConnectionString"]);
+
+        if ($_SESSION["DEBUG"]) error_log("Connection Status: " . pg_connection_status($SqlConnection));
+
+        if ($SqlConnection)
+        {
+            if ($_SESSION["DEBUG"]) error_log("Connected to SQL Server<br>");
+            $SqlConnected = true;
+        } else {
+            if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Server connection failed: " . pg_last_error($SqlConnection) . "\r\n");
+        }
+
+    } catch (PDOException $e) {
+        echo "Error while connecting to SQL server: " . $e->getMessage() . "<br>";
+    }
+
+    if ($SqlConnected)
+    {
+        try
+        {
+            $SqlString = "Select id, property_profile_id "
+                . ", case when resource_main_large_type = 'OV' then (select vzaar_video_id || '.mp4' from public.property_yacht_video LV where LV.id = resource_main_large_id) "
+                . "       when resource_main_large_type = 'OI' then (select 'superyacht-' || replace(replace(lower(regexp_replace(name, '[^\w]+','')),' ', '-'), '''', '') ||'-' || LI.id ||'.jpg' from public.property_yacht_resource LI, public.property_yacht PY where LI.property_yacht_id = PY.id and LI.id = resource_main_large_id) "
+                . "       else '' "
+                . "  end as object_image_large "
+                . ", case when resource_main_side_top_type = 'OV' then (select vzaar_video_id || '.mp4' from public.property_yacht_video LV where LV.id = resource_main_side_top_id) "
+                . "       when resource_main_side_top_type = 'OI' then (select 'superyacht-' || replace(replace(lower(regexp_replace(name, '[^\w]+','')),' ', '-'), '''', '') ||'-' || LI.id ||'.jpg' from public.property_yacht_resource LI, public.property_yacht PY where LI.property_yacht_id = PY.id and LI.id = resource_main_side_top_id) "
+                . "       else '' "
+                . "  end as object_image_side_top "
+                . ", case when resource_main_side_bot_type = 'OV' then (select vzaar_video_id || '.mp4' from public.property_yacht_video LV where LV.id = resource_main_side_bot_id) "
+                . "       when resource_main_side_bot_type = 'OI' then (select 'superyacht-' || replace(replace(lower(regexp_replace(name, '[^\w]+','')),' ', '-'), '''', '') ||'-' || LI.id ||'.jpg' from public.property_yacht_resource LI, public.property_yacht PY where LI.property_yacht_id = PY.id and LI.id = resource_main_side_bot_id) "
+                . "       else '' "
+                . "  end as object_image_side_bot "
+                . " , * "
+                . " From public.property_yacht_slide_images "
+                . " Where property_profile_id = " . $YachtProfileID;
+
+            $ResultSet = pg_query($SqlConnection, $SqlString);
+
+            if ($ResultSet)
+            {
+                while ($Row = pg_fetch_assoc($ResultSet))
+                {
+                    $TotalSlides = $TotalSlides + 1;
+
+                    if ($JavaVideoArray == "")
+                    {
+                        $JavaVideoArray = $JavaVideoArray
+                            . "['viddivhero', 'hsvid1', '" . Slugify($Row['object_image_large'])
+                            . "', 'viddivside1', 'hsvid1s', '" . Slugify ($Row['object_image_side_top'])
+                            . "', 'viddivside2', 'hsvid2s', '" . Slugify ($Row['object_image_side_bot'])
+                            . "']\r\n";
+                    } else {
+                        $JavaVideoArray = $JavaVideoArray
+                            . ", ['viddivhero', 'hsvid1', '" . Slugify($Row['object_image_large'])
+                            . "', 'viddivside1', 'hsvid1s', '" . Slugify ($Row['object_image_side_top'])
+                            . "', 'viddivside2', 'hsvid2s', '" . Slugify ($Row['object_image_side_bot'])
+                            . "']\r\n";
+                    }
+
+                }
+
+            } else {
+                if ($_SESSION["DEBUG"]) error_log("ERROR: SQL Query failed: " . pg_last_error($SqlConnection) . "\r\n");
+                if ($_SESSION["DEBUG"]) error_log("Sql Query: " . $SqlString);
+            }
+
+        } catch (PDOException $e) {
+            echo "Error while Querying SQL server: " . $e->getMessage() . "<br>";
+        }
+    }
+
+
+    $HtmlSlides = '
+            <div class="section-container section-hero">
+                <div style="position:relative; background-color: #ffffff; width: 1024px;" onmouseleave="VideoPlay(\'hsvid1\');VideoStop(\'hsvid1s\');VideoStop(\'hsvid2s\');" >
+                    <div id="MainVideo" style="position:relative; height: 386px; " >
+                  ';
+
+
+
+
+    if ($TotalSlides > 40) $TotalSlides = 40;
+    $Left = 10;
+
+    for ($i=0; $i < $TotalSlides ; $i++)
+    {
+        $HtmlSlides = $HtmlSlides . '<div class="video-icon-page" style="left:' . $Left . 'px;"><img width="10" height="10" src="/assets/images/video-icons/page-dot.png" onclick="SelectVideoPage(' . $i . ', \'MainVideo\');"></div>';
+
+        $Left = $Left + 15;
+    }
+
+
+
+    $JavaVideoArray = 'var VideoPages = [' . $JavaVideoArray . '];';
+
+    $HtmlSlides = $HtmlSlides . '
+                        <div id="viddivhero" class="video-main-hero" onmouseover="VideoPlay(\'hsvid1\');VideoStop(\'hsvid1s\');VideoStop(\'hsvid2s\');" >
+                            <div class="video-icon-expand"><img width="100" height="100" src="/assets/images/video-icons/play.png" onclick="VideoExpand_Explode1(\'viddivhero\', \'MainVideo\');"></div>
+                            <div class="video-icon-restore"><img width="20" height="20" src="/assets/images/video-icons/close.png" onclick="VideoRestore(\'viddivhero\', \'MainVideo\');"></div>
+                            <div class="video-icon-fullscreen"><img width="20" height="20" src="/assets/images/video-icons/close.png" onclick="VideoFullScreen(\'hsvid1\');"></div>
+
+                            <video id="hsvid1" preload="none" width="100%" height="100%" autoplay="autoplay" loop="loop" muted >  <!-- poster="/assets/images/heider.jpg" -->
+                                <!-- source src="/assets/videos/v.mp4#t=10,50" /-->
+                                <!-- source src="/assets/videos/v.mp4" /-->
+                                <source src="" ></source>
+                                <!-- track src="/assets/videos/v.vtt" label="HS SUB" kind="subtitles" srclang="en" default/-->
+                            </video>
+
+                            <img id="picalterhero" class="video-alternative" width="100%" height="100%" src="/assets/videos/heider.jpg"/>
+                        </div>
+
+
+                        <div id="viddivside1" class="video-main-sidetop" onmouseover="VideoPlay(\'hsvid1s\');VideoStop(\'hsvid1\');VideoStop(\'hsvid2s\');" >
+                            <div class="video-icon-expand"><img width="70" height="70" src="/assets/images/video-icons/play.png" onclick="VideoExpand_Explode1(\'viddivside1\', \'MainVideo\');"></div>
+                            <div class="video-icon-restore"><img width="20" height="20" src="/assets/images/video-icons/close.png" onclick="VideoRestore(\'viddivside1\', \'MainVideo\');"></div>
+                            <div class="video-icon-fullscreen"><img width="20" height="20" src="/assets/images/video-icons/close.png" onclick="VideoFullScreen(\'hsvid1s\');"></div>
+
+                            <video id="hsvid1s" preload="none" width="100%" height="100%" loop="loop" muted >  <!-- poster="/assets/images/heider.jpg" -->
+                                <!-- source src="/assets/videos/v.mp4#t=10,50" /-->
+                                <!-- source src="/assets/videos/v.mp4" ></source -->
+                                <source src=""/>
+                                <!-- track src="/assets/videos/v.vtt" label="HS SUB" kind="subtitles" srclang="en" default></track -->
+                            </video>
+
+                            <img id="picaltersidetop" class="video-alternative" width="100%" height="100%" src="/assets/videos/heider.jpg"/>
+                        </div>
+
+
+                        <div id="viddivside2" class="video-main-sidebottom" onmouseover="VideoPlay(\'hsvid2s\');VideoStop(\'hsvid1\');VideoStop(\'hsvid1s\');" >
+                            <div class="video-icon-expand"><img width="70" height="70" src="/assets/images/video-icons/play.png" onclick="VideoExpand_Explode1(\'viddivside2\', \'MainVideo\');"></div>
+                            <div class="video-icon-restore"><img width="20" height="20" src="/assets/images/video-icons/close.png" onclick="VideoRestore(\'viddivside2\', \'MainVideo\');"></div>
+                            <div class="video-icon-fullscreen"><img width="20" height="20" src="/assets/images/video-icons/close.png" onclick="VideoFullScreen(\'hsvid2s\');"></div>
+
+                            <video id="hsvid2s" preload="none" width="100%" height="100%" loop="loop" muted >  <!-- poster="/assets/images/heider.jpg" -->
+                                <!-- source src="/assets/videos/v.mp4#t=10,50" /-->
+                                <!-- source src="/assets/videos/v.mp4" ></source -->
+                                <source src=""/>
+                                <!-- track src="/assets/videos/v.vtt" label="HS SUB" kind="subtitles" srclang="en" default></track -->
+                            </video>
+
+                            <img id="picaltersidebot" class="video-alternative" width="100%" height="100%" src="/assets/videos/heider.jpg"/>
+                        </div>
+                    </div>
+                </div>
+        </div>
+
+    ';
+
+}
+
+
+
+
+
+function CalculateCrop($crop_x, $crop_y, $crop_w, $crop_h, $originalWidth, $originalHeight, $width, $height, &$CropImageURL)
+{
+
+
+	$requestedWidth = $width;
+	$requestedHeight = $height;
+	$requested_ratio = 0.0;
+    $crop_ratio = 0.0;
+
+    $CropImageURL = "";
+
+    if ( $width <= 0 && $height <= 0 )
+	{
+		$requested_ratio = $crop_w / $crop_h;
+		$crop_ratio = $crop_w / $crop_h;
+		$height = round ($crop_h);
+	} else if ( $width <= 0 && $height > 0 ) {
+//		width = height * (crop_w / crop_h);
+
+
+		$requested_ratio = ($crop_w / $crop_h);
+		$crop_ratio = $crop_w / $crop_h;
+
+		if ($requested_ratio > $crop_ratio)
+		{
+			$width = round( $crop_w * ($height / $crop_h) );
+		}
+
+
+
+
+
+
+
+
+
+
+
+
+		} else if ( $width > 0 && $height <= 0 ) {
+//			height = width * (crop_h / crop_w);
+
+
+
+			$requested_ratio = ($crop_h / $crop_w);
+			$crop_ratio = $crop_w / $crop_h;
+
+			if ($requested_ratio > $crop_ratio) {
+				$width = round( $crop_w * $width * $crop_w );                 // ?!!?... This does not make any sense!!
+			} else if ($requested_ratio < $crop_ratio) {
+				$height = round( $crop_h * ($width / $crop_w) );
+			}
+
+
+
+		} else {
+			$requested_ratio = $width / $height;
+			$crop_ratio = $crop_w / $crop_h;
+
+			if ($requested_ratio > $crop_ratio) {
+				$width = round( $crop_w * ($height / $crop_h) );
+			} else if ($requested_ratio < $crop_ratio) {
+				$height = round( $crop_h * ($width / $crop_w) );
+			}
+
+		}
+
+		//These are the crop values of the original coordinates, since we need to resize first, work out the size to resize to
+
+		$x_ratio = $width / $crop_w;
+		$y_ratio = $height / $crop_h;
+
+
+		//Multiply out the original width and heights
+		$width = ($x_ratio * $originalWidth);
+		$height = ($y_ratio * $originalHeight);
+
+
+
+		//Convert the coordinates and crop values
+		$crop_x = ($crop_x * $x_ratio);
+		$crop_y = ($crop_y * $y_ratio);
+		$crop_w = ($crop_w * $x_ratio);
+		$crop_h = ($crop_h * $y_ratio);
+
+
+		//Using the requested width and height, snap the crop width and height to the appropriate values
+		if (  abs($requestedWidth - $crop_w) < 5)
+		{
+			$crop_w = $requestedWidth;
+		}
+
+		if (abs($requestedHeight - $crop_h) < 5)
+		{
+			$crop_h = $requestedHeight;
+		}
+
+/*
+		CalculatedImateCrops ret = new CalculatedImateCrops();
+		ret.crop_x = crop_x;
+		ret.crop_y = crop_y;
+		ret.crop_w = crop_w;
+		ret.crop_h = crop_h;
+		ret.width = width;
+		ret.height = height;
+		return ret;
+*/
+}
+
+
+function GetImageMD5($Width, $Height, $Quality, $Options)
+{
+    //
+    // <img src="http://www.superyachts.com/syv2/resource/500-200-95-cc{30,40,450,170}-XXXXX/superyachts/property/yacht/resource/superyacht-izumi-1006.jpg"/>
+    // Where XXXXX is the MF5 output from this function..
+
+
+    $FinalURI = $_SESSION["SITE_GUID"];
+    if ($FinalURI == "")
+    {
+        $FinalURI = "000007-c0a80106-48ae9887-a656-6f024784";
+    }
+
+    if ($Width > 0)
+    {
+        $FinalURI = $FinalURI . $Width;
+    }
+
+    if ($Height > 0)
+    {
+        $FinalURI = $FinalURI . $Height;
+    }
+
+    $FinalURI = $FinalURI . $Quality;
+    $FinalURI = $FinalURI . $Options;
+
+    $Encoded = md5($FinalURI);
+
+    $Encoded = substr($Encoded,0,4);
+
+    return $Encoded;
+}
+
+
+
+?>
